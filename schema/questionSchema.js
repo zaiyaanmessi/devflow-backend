@@ -9,7 +9,9 @@ const questionSchema = new mongoose.Schema({
   views: { type: Number, default: 0 },
   acceptedAnswer: { type: mongoose.Schema.Types.ObjectId, ref: 'Answer' },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  isLocked: { type: Boolean, default: false },
+   isPinned: { type: Boolean, default: false }
 });
 
 module.exports = questionSchema;

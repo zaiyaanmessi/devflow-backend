@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   bio: String,
   reputation: { type: Number, default: 0 },
   role: { type: String, enum: ['user', 'expert', 'admin'], default: 'user' },
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   createdAt: { type: Date, default: Date.now }
 });
 

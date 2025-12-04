@@ -1,14 +1,16 @@
 const express = require('express');
-const router = express.Router();
+const router = express.Router({ mergeParams: true }); // Important: mergeParams to get :questionId
 const Answer = require('../models/Answer');
 const Question = require('../models/Question');
 const User = require('../models/user');
 const { protect } = require('../utils/auth');
 
 // Create answer (protected)
+// POST /api/questions/:questionId/answers
 router.post('/', protect, async (req, res) => {
   try {
-    const { questionId, body } = req.body;
+    const { questionId } = req.params; // Get from URL params
+    const { body } = req.body;
 
     if (!body) {
       return res.status(400).json({ error: 'Answer body is required' });
@@ -36,6 +38,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // Accept answer (protected - only question asker)
+// PUT /api/questions/:questionId/answers/:answerId/accept
 router.put('/:answerId/accept', protect, async (req, res) => {
   try {
     const answer = await Answer.findById(req.params.answerId);
@@ -92,9 +95,10 @@ router.put('/:answerId/accept', protect, async (req, res) => {
 });
 
 // Update answer (protected - only answerer)
-router.put('/:id', protect, async (req, res) => {
+// PUT /api/questions/:questionId/answers/:answerId
+router.put('/:answerId', protect, async (req, res) => {
   try {
-    const answer = await Answer.findById(req.params.id);
+    const answer = await Answer.findById(req.params.answerId);
 
     if (!answer) {
       return res.status(404).json({ error: 'Answer not found' });
@@ -121,17 +125,23 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// Delete answer (protected - only answerer)
-router.delete('/:id', protect, async (req, res) => {
+// Delete answer (protected - only answerer or admin)
+// DELETE /api/questions/:questionId/answers/:answerId
+router.delete('/:answerId', protect, async (req, res) => {
   try {
-    const answer = await Answer.findById(req.params.id);
+    const answer = await Answer.findById(req.params.answerId);
 
     if (!answer) {
       return res.status(404).json({ error: 'Answer not found' });
     }
 
-    // Check if user is the answerer
-    if (answer.answerer.toString() !== req.userId) {
+    // Get user to check role
+    const user = await User.findById(req.userId);
+    const isAdmin = user.role === 'admin';
+    const isAnswerer = answer.answerer.toString() === req.userId;
+
+    // Check if user is the answerer OR admin
+    if (!isAnswerer && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized to delete this answer' });
     }
 

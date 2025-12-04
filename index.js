@@ -1,15 +1,25 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 
-// Pretty print JSON responses
 app.set('json spaces', 2);
 
-// Middleware
-app.use(cors());
+// ⭐⭐⭐ ADD THIS - MANUAL CORS HEADERS ⭐⭐⭐
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  
+  next();
+});
+
 app.use(express.json());
 
 // Connect MongoDB
@@ -36,12 +46,15 @@ const userRoutes = require('./routes/users');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
-app.use('/api/answers', answerRoutes);
+
+// IMPORTANT: Register answers as nested route under questions
+// This allows requests like: POST /api/questions/:questionId/answers
+app.use('/api/questions/:questionId/answers', answerRoutes);
+
 app.use('/api/votes', voteRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
 
-// Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is running!' });
 });
