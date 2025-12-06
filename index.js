@@ -39,7 +39,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.log('MongoDB error:', err));
 
 // Load models
-const User = require('./models/user');
+const User = require('./models/User');
 const Question = require('./models/Question');
 const Answer = require('./models/Answer');
 const Vote = require('./models/Vote');
