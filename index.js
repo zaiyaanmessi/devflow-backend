@@ -9,7 +9,7 @@ app.set('json spaces', 2);
 // ⭐ PRODUCTION-READY CORS ⭐
 const allowedOrigins = [
   'http://localhost:3000',           // Local development
-  'https://your-vercel-domain.vercel.app', // Will update this after Vercel deployment
+  'https://devflow-frontend-inky.vercel.app', // Will update this after Vercel deployment
 ];
 
 app.use((req, res, next) => {
