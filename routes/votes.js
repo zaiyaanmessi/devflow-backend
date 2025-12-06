@@ -3,7 +3,7 @@ const router = express.Router();
 const Vote = require('../models/Vote');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
-const User = require('../models/user');
+const User = require('../models/User');
 const { protect } = require('../utils/auth');
 
 // Vote on question or answer (protected)

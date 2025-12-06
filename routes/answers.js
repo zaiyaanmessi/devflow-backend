@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true }); // Important: mergeParams to get :questionId
 const Answer = require('../models/Answer');
 const Question = require('../models/Question');
-const User = require('../models/user');
+const User = require('../models/User');
 const { protect } = require('../utils/auth');
 
 // Create answer (protected)

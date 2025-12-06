@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/user');
+const User = require('../models/User');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
 const { protect } = require('../utils/auth');
