@@ -6,9 +6,20 @@ const app = express();
 
 app.set('json spaces', 2);
 
-// ⭐⭐⭐ ADD THIS - MANUAL CORS HEADERS ⭐⭐⭐
+// ⭐ PRODUCTION-READY CORS ⭐
+const allowedOrigins = [
+  'http://localhost:3000',           // Local development
+  'https://your-vercel-domain.vercel.app', // Will update this after Vercel deployment
+];
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  const origin = req.headers.origin;
+  
+  // Allow requests from allowed origins
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -46,20 +57,23 @@ const userRoutes = require('./routes/users');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
-
-// IMPORTANT: Register answers as nested route under questions
-// This allows requests like: POST /api/questions/:questionId/answers
 app.use('/api/questions/:questionId/answers', answerRoutes);
-
 app.use('/api/votes', voteRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
 
+// Health check endpoint
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'Backend is running!' });
+  res.json({ message: 'Backend is running!', environment: process.env.NODE_ENV });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✓ Server running on http://localhost:${PORT}`);
+  console.log(`✓ Server running on port ${PORT}`);
+  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
 });

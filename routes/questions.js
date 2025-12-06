@@ -207,4 +207,149 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// ============ ANSWER ROUTES ============
+
+// Create answer (protected)
+router.post('/:id/answers', protect, async (req, res) => {
+  try {
+    const { body } = req.body;
+
+    if (!body) {
+      return res.status(400).json({ error: 'Answer body is required' });
+    }
+
+    const question = await Question.findById(req.params.id);
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    const answer = await Answer.create({
+      body,
+      questionId: req.params.id,
+      answerer: req.userId
+    });
+
+    const populatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role');
+
+    res.status(201).json(populatedAnswer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update answer (protected - only answerer)
+router.put('/:id/answers/:answerId', protect, async (req, res) => {
+  try {
+    const { body } = req.body;
+
+    if (!body) {
+      return res.status(400).json({ error: 'Answer body is required' });
+    }
+
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    // Check if user is the answerer
+    if (answer.answerer.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Not authorized to update this answer' });
+    }
+
+    answer.body = body;
+    answer.updatedAt = Date.now();
+    await answer.save();
+
+    const updatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role');
+
+    res.json(updatedAnswer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete answer (protected - only answerer or admin)
+router.delete('/:id/answers/:answerId', protect, async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    // Check if user is the answerer
+    if (answer.answerer.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this answer' });
+    }
+
+    await answer.deleteOne();
+    
+    // Delete associated comments
+    await Comment.deleteMany({ targetType: 'answer', targetId: req.params.answerId });
+
+    res.json({ message: 'Answer deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ACCEPT ANSWER (protected - only question asker can accept)
+router.put('/:id/answers/:answerId/accept', protect, async (req, res) => {
+  try {
+    const { id, answerId } = req.params;
+
+    // Find the question
+    const question = await Question.findById(id);
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    // Check if user is the question asker (only they can accept answers)
+    if (question.asker.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Only the question asker can accept answers' });
+    }
+
+    // Find the answer
+    const answer = await Answer.findById(answerId);
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    // Verify answer belongs to this question
+    if (answer.questionId.toString() !== id) {
+      return res.status(400).json({ error: 'Answer does not belong to this question' });
+    }
+
+    // If there's already an accepted answer, unaccept it
+    if (question.acceptedAnswer) {
+      const oldAcceptedAnswer = await Answer.findById(question.acceptedAnswer);
+      if (oldAcceptedAnswer) {
+        oldAcceptedAnswer.isAccepted = false;
+        await oldAcceptedAnswer.save();
+      }
+    }
+
+    // Mark this answer as accepted
+    answer.isAccepted = true;
+    await answer.save();
+
+    // Update question with accepted answer
+    question.acceptedAnswer = answerId;
+    await question.save();
+
+    const updatedAnswer = await Answer.findById(answerId)
+      .populate('answerer', 'username reputation role');
+
+    res.json({
+      message: 'Answer accepted successfully',
+      answer: updatedAnswer
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
