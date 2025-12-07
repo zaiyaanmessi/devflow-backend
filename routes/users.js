@@ -71,6 +71,51 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
+// ⭐ NEW - Update user role (protected - admin or self only)
+router.put('/:id/role', protect, async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    // Validate role
+    if (!['user', 'expert', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be user, expert, or admin' });
+    }
+
+    // Get current user to check if admin
+    const currentUser = await User.findById(req.userId);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'Current user not found' });
+    }
+
+    // Check authorization: only admin or self can change role
+    const isOwnProfile = req.params.id === req.userId;
+    const isAdmin = currentUser.role === 'admin';
+
+    if (!isOwnProfile && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to change this user\'s role' });
+    }
+
+    // Get target user
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update role
+    user.role = role;
+    await user.save();
+
+    const updatedUser = await User.findById(user._id).select('-password');
+
+    res.json({
+      message: `Role updated to ${role}`,
+      user: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get user's questions (public)
 router.get('/:id/questions', async (req, res) => {
   try {

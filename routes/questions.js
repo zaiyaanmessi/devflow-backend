@@ -3,6 +3,7 @@ const router = express.Router();
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
 const Comment = require('../models/Comment');
+const User = require('../models/user');
 const { protect } = require('../utils/auth');
 
 // Get all questions (public)
@@ -158,8 +159,11 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Check if user is the asker
-    if (question.asker.toString() !== req.userId) {
+    // Get user to check role
+    const user = await User.findById(req.userId);
+
+    // Check if user is the asker or admin
+    if (question.asker.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to update this question' });
     }
 
@@ -181,7 +185,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// Delete question (protected - only asker or admin)
+// Delete question (protected - only asker or admin) ⭐ FIXED
 router.delete('/:id', protect, async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -190,8 +194,11 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Check if user is the asker
-    if (question.asker.toString() !== req.userId) {
+    // Get user to check role ⭐ NEW
+    const user = await User.findById(req.userId);
+
+    // Check if user is the asker OR admin ⭐ FIXED
+    if (question.asker.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to delete this question' });
     }
 
@@ -271,7 +278,7 @@ router.put('/:id/answers/:answerId', protect, async (req, res) => {
   }
 });
 
-// Delete answer (protected - only answerer or admin)
+// Delete answer (protected - only answerer or admin) ⭐ FIXED
 router.delete('/:id/answers/:answerId', protect, async (req, res) => {
   try {
     const answer = await Answer.findById(req.params.answerId);
@@ -280,8 +287,11 @@ router.delete('/:id/answers/:answerId', protect, async (req, res) => {
       return res.status(404).json({ error: 'Answer not found' });
     }
 
-    // Check if user is the answerer
-    if (answer.answerer.toString() !== req.userId) {
+    // Get user to check role ⭐ NEW
+    const user = await User.findById(req.userId);
+
+    // Check if user is the answerer OR admin ⭐ FIXED
+    if (answer.answerer.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to delete this answer' });
     }
 

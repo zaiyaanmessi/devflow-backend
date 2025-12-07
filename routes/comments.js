@@ -3,9 +3,10 @@ const router = express.Router();
 const Comment = require('../models/Comment');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
+const User = require('../models/user');
 const { protect } = require('../utils/auth');
 
-// Create comment (protected)
+// Create comment (protected) ⭐ FIXED - Allow admin to comment
 router.post('/', protect, async (req, res) => {
   try {
     const { body, targetType, targetId } = req.body;
@@ -30,6 +31,12 @@ router.post('/', protect, async (req, res) => {
       return res.status(404).json({ error: `${targetType} not found` });
     }
 
+    // ⭐ NEW - Get user to verify they can comment
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const comment = await Comment.create({
       body,
       author: req.userId,
@@ -46,7 +53,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// Delete comment (protected - only author)
+// Delete comment (protected - author or admin) ⭐ FIXED
 router.delete('/:id', protect, async (req, res) => {
   try {
     const comment = await Comment.findById(req.params.id);
@@ -55,8 +62,11 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Comment not found' });
     }
 
-    // Check if user is the author
-    if (comment.author.toString() !== req.userId) {
+    // Get user to check role ⭐ NEW
+    const user = await User.findById(req.userId);
+
+    // Check if user is the author OR admin ⭐ FIXED
+    if (comment.author.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to delete this comment' });
     }
 
