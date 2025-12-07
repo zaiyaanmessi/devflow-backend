@@ -3,7 +3,6 @@ const router = express.Router();
 const Vote = require('../models/Vote');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
-const User = require('../models/User');
 const { protect } = require('../utils/auth');
 
 // Vote on question or answer (protected)
@@ -48,12 +47,6 @@ router.post('/', protect, async (req, res) => {
         target.votes -= value;
         await target.save();
 
-        // Update target author's reputation
-        const authorId = targetType === 'question' ? target.asker : target.answerer;
-        await User.findByIdAndUpdate(authorId, {
-          $inc: { reputation: -value }
-        });
-
         return res.json({ message: 'Vote removed', votes: target.votes });
       } else {
         // Change vote (upvote to downvote or vice versa)
@@ -65,12 +58,6 @@ router.post('/', protect, async (req, res) => {
         // Update vote count
         target.votes += diff;
         await target.save();
-
-        // Update target author's reputation
-        const authorId = targetType === 'question' ? target.asker : target.answerer;
-        await User.findByIdAndUpdate(authorId, {
-          $inc: { reputation: diff }
-        });
 
         return res.json({ message: 'Vote updated', votes: target.votes });
       }
@@ -87,12 +74,6 @@ router.post('/', protect, async (req, res) => {
     // Update vote count
     target.votes += value;
     await target.save();
-
-    // Update target author's reputation
-    const authorId = targetType === 'question' ? target.asker : target.answerer;
-    await User.findByIdAndUpdate(authorId, {
-      $inc: { reputation: value }
-    });
 
     res.status(201).json({ message: 'Vote recorded', votes: target.votes });
   } catch (error) {

@@ -11,10 +11,8 @@ router.get('/', async (req, res) => {
   try {
     const { page = 1, limit = 10, search, tags, sort = 'newest' } = req.query;
 
-    // Build query
     let query = {};
 
-    // Search by title or body
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -22,23 +20,23 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Filter by tags
     if (tags) {
       const tagArray = tags.split(',');
       query.tags = { $in: tagArray };
     }
 
-    // Sort options
     let sortOption = {};
     if (sort === 'newest') {
-      sortOption = { createdAt: -1 };
+      sortOption = { isPinned: -1, createdAt: -1 };
     } else if (sort === 'votes') {
-      sortOption = { votes: -1 };
+      sortOption = { isPinned: -1, votes: -1 };
     } else if (sort === 'views') {
-      sortOption = { views: -1 };
+      sortOption = { isPinned: -1, views: -1 };
+    } else {
+      // Default sorting - pinned first
+      sortOption = { isPinned: -1, createdAt: -1 };
     }
 
-    // Execute query with pagination
     const questions = await Question.find(query)
       .sort(sortOption)
       .limit(limit * 1)
@@ -46,10 +44,8 @@ router.get('/', async (req, res) => {
       .populate('asker', 'username reputation')
       .exec();
 
-    // Count total questions
     const count = await Question.countDocuments(query);
 
-    // Count answers for each question
     const questionsWithAnswers = await Promise.all(
       questions.map(async (question) => {
         const answerCount = await Answer.countDocuments({ questionId: question._id });
@@ -81,16 +77,14 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Increment view count
     question.views += 1;
     await question.save();
 
-    // Get answers with their comments
     const answers = await Answer.find({ questionId: question._id })
       .populate('answerer', 'username reputation role')
+      .populate('verifiedBy', 'username role')
       .sort({ isAccepted: -1, votes: -1 });
 
-    // Get comments for each answer
     const answersWithComments = await Promise.all(
       answers.map(async (answer) => {
         const comments = await Comment.find({
@@ -107,7 +101,6 @@ router.get('/:id', async (req, res) => {
       })
     );
 
-    // Get comments for the question
     const questionComments = await Comment.find({
       targetType: 'question',
       targetId: question._id
@@ -159,10 +152,8 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Get user to check role
     const user = await User.findById(req.userId);
 
-    // Check if user is the asker or admin
     if (question.asker.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to update this question' });
     }
@@ -185,7 +176,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// Delete question (protected - only asker or admin) ⭐ FIXED
+// Delete question (protected - only asker or admin)
 router.delete('/:id', protect, async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -194,15 +185,12 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Get user to check role ⭐ NEW
     const user = await User.findById(req.userId);
 
-    // Check if user is the asker OR admin ⭐ FIXED
     if (question.asker.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to delete this question' });
     }
 
-    // Delete associated answers and comments
     await Answer.deleteMany({ questionId: question._id });
     await Comment.deleteMany({ targetType: 'question', targetId: question._id });
 
@@ -260,7 +248,6 @@ router.put('/:id/answers/:answerId', protect, async (req, res) => {
       return res.status(404).json({ error: 'Answer not found' });
     }
 
-    // Check if user is the answerer
     if (answer.answerer.toString() !== req.userId) {
       return res.status(403).json({ error: 'Not authorized to update this answer' });
     }
@@ -278,7 +265,7 @@ router.put('/:id/answers/:answerId', protect, async (req, res) => {
   }
 });
 
-// Delete answer (protected - only answerer or admin) ⭐ FIXED
+// Delete answer (protected - only answerer or admin)
 router.delete('/:id/answers/:answerId', protect, async (req, res) => {
   try {
     const answer = await Answer.findById(req.params.answerId);
@@ -287,17 +274,13 @@ router.delete('/:id/answers/:answerId', protect, async (req, res) => {
       return res.status(404).json({ error: 'Answer not found' });
     }
 
-    // Get user to check role ⭐ NEW
     const user = await User.findById(req.userId);
 
-    // Check if user is the answerer OR admin ⭐ FIXED
     if (answer.answerer.toString() !== req.userId && user.role !== 'admin') {
       return res.status(403).json({ error: 'Not authorized to delete this answer' });
     }
 
     await answer.deleteOne();
-    
-    // Delete associated comments
     await Comment.deleteMany({ targetType: 'answer', targetId: req.params.answerId });
 
     res.json({ message: 'Answer deleted successfully' });
@@ -306,29 +289,141 @@ router.delete('/:id/answers/:answerId', protect, async (req, res) => {
   }
 });
 
+// ============ VOTING ROUTES ============
+
+// UPVOTE QUESTION (protected)
+router.post('/:id/upvote', protect, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.id);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    if (question.asker.toString() === req.userId) {
+      return res.status(400).json({ error: 'You cannot vote on your own question' });
+    }
+
+    question.votes += 1;
+    await question.save();
+
+    const updatedQuestion = await Question.findById(question._id)
+      .populate('asker', 'username reputation');
+
+    res.json({
+      message: 'Question upvoted successfully',
+      question: updatedQuestion
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DOWNVOTE QUESTION (protected)
+router.post('/:id/downvote', protect, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.id);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    if (question.asker.toString() === req.userId) {
+      return res.status(400).json({ error: 'You cannot vote on your own question' });
+    }
+
+    question.votes -= 1;
+    await question.save();
+
+    const updatedQuestion = await Question.findById(question._id)
+      .populate('asker', 'username reputation');
+
+    res.json({
+      message: 'Question downvoted successfully',
+      question: updatedQuestion
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UPVOTE ANSWER (protected)
+router.post('/:id/answers/:answerId/upvote', protect, async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    if (answer.answerer.toString() === req.userId) {
+      return res.status(400).json({ error: 'You cannot vote on your own answer' });
+    }
+
+    answer.votes += 1;
+    await answer.save();
+
+    const updatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role');
+
+    res.json({
+      message: 'Answer upvoted successfully',
+      answer: updatedAnswer
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DOWNVOTE ANSWER (protected)
+router.post('/:id/answers/:answerId/downvote', protect, async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    if (answer.answerer.toString() === req.userId) {
+      return res.status(400).json({ error: 'You cannot vote on your own answer' });
+    }
+
+    answer.votes -= 1;
+    await answer.save();
+
+    const updatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role');
+
+    res.json({
+      message: 'Answer downvoted successfully',
+      answer: updatedAnswer
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ ACCEPT ANSWER ============
+
 // ACCEPT ANSWER (protected - only question asker can accept)
 router.put('/:id/answers/:answerId/accept', protect, async (req, res) => {
   try {
     const { id, answerId } = req.params;
 
-    // Find the question
     const question = await Question.findById(id);
     if (!question) {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    // Check if user is the question asker (only they can accept answers)
     if (question.asker.toString() !== req.userId) {
       return res.status(403).json({ error: 'Only the question asker can accept answers' });
     }
 
-    // Find the answer
     const answer = await Answer.findById(answerId);
     if (!answer) {
       return res.status(404).json({ error: 'Answer not found' });
     }
 
-    // Verify answer belongs to this question
     if (answer.questionId.toString() !== id) {
       return res.status(400).json({ error: 'Answer does not belong to this question' });
     }
@@ -355,6 +450,155 @@ router.put('/:id/answers/:answerId/accept', protect, async (req, res) => {
 
     res.json({
       message: 'Answer accepted successfully',
+      answer: updatedAnswer
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ EXPERT FEATURES ============
+
+// PIN QUESTION (protected - only expert or admin can pin their own questions)
+router.post('/:id/pin', protect, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.id);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    // Check if user is expert or admin
+    const user = await User.findById(req.userId);
+    if (user.role !== 'expert' && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only experts and admins can pin questions' });
+    }
+
+    // Check if user is the question asker (for non-admins)
+    if (user.role !== 'admin' && question.asker.toString() !== req.userId) {
+      return res.status(403).json({ error: 'You can only pin your own questions' });
+    }
+
+    // Pin the question
+    question.isPinned = true;
+    await question.save();
+
+    const updatedQuestion = await Question.findById(question._id)
+      .populate('asker', 'username reputation role');
+
+    res.json({
+      message: 'Question pinned successfully',
+      question: updatedQuestion
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UNPIN QUESTION (protected - only expert or admin can unpin their own questions)
+router.post('/:id/unpin', protect, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.id);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    // Check if user is expert or admin
+    const user = await User.findById(req.userId);
+    if (user.role !== 'expert' && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only experts and admins can unpin questions' });
+    }
+
+    // Check if user is the question asker (for non-admins)
+    if (user.role !== 'admin' && question.asker.toString() !== req.userId) {
+      return res.status(403).json({ error: 'You can only unpin your own questions' });
+    }
+
+    // Unpin the question
+    question.isPinned = false;
+    await question.save();
+
+    const updatedQuestion = await Question.findById(question._id)
+      .populate('asker', 'username reputation role');
+
+    res.json({
+      message: 'Question unpinned successfully',
+      question: updatedQuestion
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// VERIFY ANSWER (protected - only expert or admin can verify answers)
+router.post('/:id/answers/:answerId/verify', protect, async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    // Check if user is expert or admin
+    const user = await User.findById(req.userId);
+    if (user.role !== 'expert' && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only experts and admins can verify answers' });
+    }
+
+    // Experts cannot verify their own answers
+    if (user.role === 'expert' && answer.answerer.toString() === req.userId) {
+      return res.status(403).json({ error: 'You cannot verify your own answers' });
+    }
+
+    // Verify the answer
+    answer.isVerified = true;
+    answer.verifiedBy = req.userId;
+    await answer.save();
+
+    const updatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role')
+      .populate('verifiedBy', 'username role');
+
+    res.json({
+      message: 'Answer verified successfully',
+      answer: updatedAnswer
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UNVERIFY ANSWER (protected - only the expert/admin who verified can unverify)
+router.post('/:id/answers/:answerId/unverify', protect, async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+
+    if (!answer) {
+      return res.status(404).json({ error: 'Answer not found' });
+    }
+
+    // Check if user is expert or admin
+    const user = await User.findById(req.userId);
+    if (user.role !== 'expert' && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only experts and admins can unverify answers' });
+    }
+
+    // Check if user is the one who verified it (or is admin)
+    if (user.role !== 'admin' && answer.verifiedBy?.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Only the verifier can unverify this answer' });
+    }
+
+    // Unverify the answer
+    answer.isVerified = false;
+    answer.verifiedBy = null;
+    await answer.save();
+
+    const updatedAnswer = await Answer.findById(answer._id)
+      .populate('answerer', 'username reputation role');
+
+    res.json({
+      message: 'Answer unverified successfully',
       answer: updatedAnswer
     });
   } catch (error) {

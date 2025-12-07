@@ -64,11 +64,6 @@ router.put('/:answerId/accept', protect, async (req, res) => {
       if (prevAnswer) {
         prevAnswer.isAccepted = false;
         await prevAnswer.save();
-
-        // Remove reputation from previous answerer
-        await User.findByIdAndUpdate(prevAnswer.answerer, {
-          $inc: { reputation: -15 }
-        });
       }
     }
 
@@ -80,11 +75,7 @@ router.put('/:answerId/accept', protect, async (req, res) => {
     question.acceptedAnswer = answer._id;
     await question.save();
 
-    // Add reputation to answerer
-    await User.findByIdAndUpdate(answer.answerer, {
-      $inc: { reputation: 15 }
-    });
-
+    // Populate answer with answerer data
     const populatedAnswer = await Answer.findById(answer._id)
       .populate('answerer', 'username reputation role');
 
