@@ -23,6 +23,8 @@ router.get('/:id', async (req, res) => {
       username: user.username,
       email: user.email,
       bio: user.bio,
+      title: user.title,
+      location: user.location,
       reputation: user.reputation,
       role: user.role,
       createdAt: user.createdAt,
@@ -48,7 +50,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { username, bio } = req.body;
+    const { username, bio, title, location } = req.body;
 
     // Check if username is taken (if changing username)
     if (username && username !== user.username) {
@@ -60,6 +62,8 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     if (bio !== undefined) user.bio = bio;
+    if (title !== undefined) user.title = title;
+    if (location !== undefined) user.location = location;
 
     await user.save();
 
@@ -71,7 +75,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// ⭐ NEW - Update user role (protected - admin or self only)
+// ⭐ Update user role (protected - admin or self only)
 router.put('/:id/role', protect, async (req, res) => {
   try {
     const { role } = req.body;
