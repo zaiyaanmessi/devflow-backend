@@ -3,7 +3,7 @@ const router = express.Router();
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
 const Comment = require('../models/Comment');
-const User = require('../models/user');
+const User = require('../models/User');
 const { protect } = require('../utils/auth');
 
 // Get all questions (public)

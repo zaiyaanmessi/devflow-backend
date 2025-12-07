@@ -3,7 +3,7 @@ const router = express.Router();
 const Comment = require('../models/Comment');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
-const User = require('../models/user');
+const User = require('../models/User');
 const { protect } = require('../utils/auth');
 
 // Create comment (protected) ⭐ FIXED - Allow admin to comment
