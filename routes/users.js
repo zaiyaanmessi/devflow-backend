@@ -36,46 +36,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update user profile (protected - own profile only)
-router.put('/:id', protect, async (req, res) => {
-  try {
-    // Check if user is updating their own profile
-    if (req.params.id !== req.userId) {
-      return res.status(403).json({ error: 'Not authorized to update this profile' });
-    }
-
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const { username, bio, title, location } = req.body;
-
-    // Check if username is taken (if changing username)
-    if (username && username !== user.username) {
-      const usernameExists = await User.findOne({ username });
-      if (usernameExists) {
-        return res.status(400).json({ error: 'Username already taken' });
-      }
-      user.username = username;
-    }
-
-    if (bio !== undefined) user.bio = bio;
-    if (title !== undefined) user.title = title;
-    if (location !== undefined) user.location = location;
-
-    await user.save();
-
-    const updatedUser = await User.findById(user._id).select('-password');
-
-    res.json(updatedUser);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ⭐ Update user role (protected - admin or self only)
+// NOTE: This route must come BEFORE /:id to avoid route conflicts
 router.put('/:id/role', protect, async (req, res) => {
   try {
     const { role } = req.body;
@@ -115,6 +77,45 @@ router.put('/:id/role', protect, async (req, res) => {
       message: `Role updated to ${role}`,
       user: updatedUser
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user profile (protected - own profile only)
+router.put('/:id', protect, async (req, res) => {
+  try {
+    // Check if user is updating their own profile
+    if (req.params.id !== req.userId) {
+      return res.status(403).json({ error: 'Not authorized to update this profile' });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { username, bio, title, location } = req.body;
+
+    // Check if username is taken (if changing username)
+    if (username && username !== user.username) {
+      const usernameExists = await User.findOne({ username });
+      if (usernameExists) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+      user.username = username;
+    }
+
+    if (bio !== undefined) user.bio = bio;
+    if (title !== undefined) user.title = title;
+    if (location !== undefined) user.location = location;
+
+    await user.save();
+
+    const updatedUser = await User.findById(user._id).select('-password');
+
+    res.json(updatedUser);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
