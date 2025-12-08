@@ -33,4 +33,21 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { generateToken, protect };
+// Optional middleware - gets user ID if token exists, but doesn't require it
+const optionalAuth = async (req, res, next) => {
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.userId = decoded.id;
+    } catch (error) {
+      // Token is invalid, but that's OK - just continue without user ID
+    }
+  }
+
+  next();
+};
+
+module.exports = { generateToken, protect, optionalAuth };

@@ -4,7 +4,7 @@ const Question = require('../models/Question');
 const Answer = require('../models/Answer');
 const Comment = require('../models/Comment');
 const User = require('../models/User');
-const { protect } = require('../utils/auth');
+const { protect, optionalAuth } = require('../utils/auth');
 
 // Get all questions (public)
 router.get('/', async (req, res) => {
@@ -68,7 +68,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get single question by ID (public)
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth ,async (req, res) => {
   try {
     const question = await Question.findById(req.params.id)
       .populate('asker', 'username reputation role');
@@ -77,7 +77,25 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    question.views += 1;
+    // Initialize viewers array if it doesn't exist (for old questions)
+    if (!question.viewers) {
+      question.viewers = [];
+    }
+
+    // Only increment views if user is logged in AND hasn't viewed before
+    if (req.userId) {
+      // Check if this user has already viewed this question
+      const hasViewed = question.viewers.some(viewer => viewer.toString() === req.userId.toString());
+
+      if (!hasViewed) {
+        // User hasn't viewed before, so add them and increment views
+        question.viewers.push(req.userId);
+        question.views += 1;
+      }
+      // If they have viewed before, don't increment
+    }
+    // If not logged in (anonymous), we don't count the view
+
     await question.save();
 
     const answers = await Answer.find({ questionId: question._id })
@@ -131,7 +149,8 @@ router.post('/', protect, async (req, res) => {
       title,
       body,
       tags: tags || [],
-      asker: req.userId
+      asker: req.userId,
+      viewers: [req.userId]
     });
 
     const populatedQuestion = await Question.findById(question._id)
