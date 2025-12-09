@@ -6,8 +6,8 @@ const answerSchema = new mongoose.Schema({
   body: { type: String, required: true },
   votes: { type: Number, default: 0 },
   isAccepted: { type: Boolean, default: false },
-  isVerified: { type: Boolean, default: false },           // ⭐ NEW - Expert verification
-  verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // ⭐ NEW - Track who verified
+  isVerified: { type: Boolean, default: false },          
+  verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

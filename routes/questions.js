@@ -308,7 +308,7 @@ router.delete('/:id/answers/:answerId', protect, async (req, res) => {
   }
 });
 
-// ============ VOTING ROUTES ============
+// VOTING ROUTES 
 
 // UPVOTE QUESTION (protected)
 router.post('/:id/upvote', protect, async (req, res) => {
@@ -422,7 +422,7 @@ router.post('/:id/answers/:answerId/downvote', protect, async (req, res) => {
   }
 });
 
-// ============ ACCEPT ANSWER ============
+// ACCEPT ANSWER 
 
 // ACCEPT ANSWER (protected - only question asker can accept)
 router.put('/:id/answers/:answerId/accept', protect, async (req, res) => {
@@ -476,7 +476,7 @@ router.put('/:id/answers/:answerId/accept', protect, async (req, res) => {
   }
 });
 
-// ============ EXPERT FEATURES ============
+//  EXPERT FEATURES 
 
 // PIN QUESTION (protected - only expert or admin can pin their own questions)
 router.post('/:id/pin', protect, async (req, res) => {

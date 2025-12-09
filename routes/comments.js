@@ -31,7 +31,7 @@ router.post('/', protect, async (req, res) => {
       return res.status(404).json({ error: `${targetType} not found` });
     }
 
-    // ⭐ NEW - Get user to verify they can comment
+    //Get user to verify they can comment
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

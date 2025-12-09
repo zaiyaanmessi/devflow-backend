@@ -6,10 +6,10 @@ const app = express();
 
 app.set('json spaces', 2);
 
-// ⭐ PRODUCTION-READY CORS ⭐
+// PRODUCTION-READY CORS 
 const allowedOrigins = [
-  'http://localhost:3000',           // Local development
-  'https://devflow-frontend-inky.vercel.app', // Will update this after Vercel deployment
+  'http://localhost:3000',         
+  'https://devflow-frontend-inky.vercel.app', 
 ];
 
 app.use((req, res, next) => {
